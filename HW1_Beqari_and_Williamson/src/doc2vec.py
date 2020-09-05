@@ -4,9 +4,6 @@ from sklearn.model_selection import train_test_split
 import pandas as pd
 import numpy as np
 import multiprocessing
-# import os
-
-# source: https://towardsdatascience.com/a-beginners-guide-to-word-embedding-with-gensim-word2vec-model-5970fa56cc92
 
 # read in data
 train_data = pd.read_csv('trainhw1.txt', sep="\t", names=["label", "comment"])
@@ -27,15 +24,13 @@ x_train["label"] = y_train
 x_eval = x_eval.to_frame()
 x_eval["label"] = y_eval
 
-error_index = 0
-
 def paragraph_to_tokens(paragraph):
     try:
         text_dict = clean_text_by_word(paragraph)
         tokens = [value.token for key, value in text_dict.items()]
         return tokens
     except TypeError:
-        print('error: nan found in paragraph - {}'.format(paragraph))
+        print('warning: nan found in paragraph - {}'.format(paragraph))
     return []
 
 # step 1: convert paragraph to tokens
@@ -61,9 +56,9 @@ model_d2v = Doc2Vec(
     window=3, 
     min_count=2, 
     workers=cores, 
-    alpha=0.025, 
+    alpha=0.005, 
     min_alpha=0.001,
-    dbow_words=0, # 0-bow, 1-skip gram 
+    dbow_words=1, # 0-bow, 1-skip gram 
     epochs=30)
 
 # step 2: retrieve embeddings from model
