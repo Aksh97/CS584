@@ -2,10 +2,6 @@ from statistics import mode
 from sklearn.metrics import accuracy_score
 import pandas as pd
 import numpy as np
-# import os
-# os.remove("./dummy.pkl")
-
-# https://towardsdatascience.com/implementing-multi-class-text-classification-with-doc2vec-df7c3812824d#:~:text=2.,and%20train%20for%2030%20epochs.
 
 # read in the data
 x_train = pd.read_pickle("x_train.pkl");
@@ -14,13 +10,19 @@ x_test  = pd.read_pickle("x_test.pkl");
 
 ### *** knn from scratch ***
 
-num_neighbors = 25
+num_neighbors = 30
 
 def euclidean_distance(x, y):
     return np.linalg.norm(x-y)
 
 def cosine_similarity(x, y):
     return np.dot(x, y) / (np.linalg.norm(x) * np.linalg.norm(y))
+
+def prediction_to_text(value):
+    if value == 1: 
+        return "+1"
+    else:
+        return "-1"
 
 def knn(rows, row, num_neighbors):
     distance_and_label = []
@@ -42,7 +44,9 @@ def knn(rows, row, num_neighbors):
 
 # step 3: evaluate
 x_eval["prediction"] = x_eval["embeddings"].apply(lambda row: knn(x_train[["embeddings", "label"]].values.tolist(), row, num_neighbors))
-# print(x_eval["prediction"].head(5))
-# x_eval.to_csv('baseline-eval.csv', index=False)
-
 print(accuracy_score(x_eval["label"].tolist(), x_eval["prediction"].tolist()))
+
+# step 4: predict
+# x_test["prediction"] = x_test["embeddings"].apply(lambda row: knn(x_train[["embeddings", "label"]].values.tolist(), row, num_neighbors))
+# x_test["output"] = x_test["prediction"].apply(lambda row: prediction_to_text(row))
+# x_test["output"].to_csv(r'predictions.txt', header=None, index=None)
