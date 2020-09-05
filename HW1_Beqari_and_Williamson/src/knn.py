@@ -36,6 +36,7 @@ def knn(rows, row, num_neighbors):
     sorted_distance_and_label = sorted(distance_and_label, key=lambda x: x[0], reverse=True)[:num_neighbors]
     # return the mode of the neighbors 
     knn_labels = [element[1] for element in sorted_distance_and_label]
+    # prediction = max(set(knn_labels ), key=knn_labels.count)
     return mode(knn_labels)
 
 # step 3: evaluate
