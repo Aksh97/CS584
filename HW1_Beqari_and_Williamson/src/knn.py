@@ -44,6 +44,6 @@ def knn(rows, row, num_neighbors):
 x_test["prediction"] = x_test["embeddings"].apply(lambda row: knn(x_train[["embeddings", "label"]].values.tolist(), row, num_neighbors))
 x_test["prediction"].to_csv(r'predictions_beqari_and_williamson.txt', header=None, index=None)
 
-# # check
+# check number of prediction rows
 row, col = x_test.shape
 print("num rows written: ", row)
