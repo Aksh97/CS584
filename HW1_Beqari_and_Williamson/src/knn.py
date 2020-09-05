@@ -8,7 +8,7 @@ x_train = pd.read_pickle("x_train.pkl");
 x_eval  = pd.read_pickle("x_eval.pkl");
 x_test  = pd.read_pickle("x_test.pkl");
 
-### *** knn from scratch ***
+# *** knn from scratch ***
 
 num_neighbors = 30
 
