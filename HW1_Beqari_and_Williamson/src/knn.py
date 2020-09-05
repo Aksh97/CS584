@@ -18,12 +18,6 @@ def euclidean_distance(x, y):
 def cosine_similarity(x, y):
     return np.dot(x, y) / (np.linalg.norm(x) * np.linalg.norm(y))
 
-def prediction_to_text(value):
-    if value == 1: 
-        return "+1"
-    else:
-        return "-1"
-
 def knn(rows, row, num_neighbors):
     distance_and_label = []
     # calculate distance and keep track of labels
@@ -43,10 +37,13 @@ def knn(rows, row, num_neighbors):
     return prediction
 
 # step 3: evaluate
-x_eval["prediction"] = x_eval["embeddings"].apply(lambda row: knn(x_train[["embeddings", "label"]].values.tolist(), row, num_neighbors))
-print(accuracy_score(x_eval["label"].tolist(), x_eval["prediction"].tolist()))
+# x_eval["prediction"] = x_eval["embeddings"].apply(lambda row: knn(x_train[["embeddings", "label"]].values.tolist(), row, num_neighbors))
+# print(accuracy_score(x_eval["label"].tolist(), x_eval["prediction"].tolist()))
 
 # step 4: predict
-# x_test["prediction"] = x_test["embeddings"].apply(lambda row: knn(x_train[["embeddings", "label"]].values.tolist(), row, num_neighbors))
-# x_test["output"] = x_test["prediction"].apply(lambda row: prediction_to_text(row))
-# x_test["output"].to_csv(r'predictions.txt', header=None, index=None)
+x_test["prediction"] = x_test["embeddings"].apply(lambda row: knn(x_train[["embeddings", "label"]].values.tolist(), row, num_neighbors))
+x_test["prediction"].to_csv(r'predictions_beqari_and_williamson.txt', header=None, index=None)
+
+# # check
+row, col = x_test.shape
+print("num rows written: ", row)
