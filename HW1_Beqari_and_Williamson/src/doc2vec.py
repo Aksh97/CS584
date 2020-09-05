@@ -5,9 +5,37 @@ import pandas as pd
 import numpy as np
 import multiprocessing
 
-# read in data
-train_data = pd.read_csv('trainhw1.txt', sep="\t", names=["label", "comment"])
-x_test     = pd.read_csv('testdatahw1.txt', names=["comment"])
+# read in data 
+# warning: pandas ignores bad rows
+train_labels = []
+train_comments = []
+valid_labels = ["+1", "-1"]
+with open('trainhw1.txt') as file_reader:
+    lines = file_reader.readlines()
+    for index, line in enumerate(lines):
+        labeled_review = line.strip().split("\t")
+        label = labeled_review[0].strip()
+        if label not in valid_labels:
+            label = "<SKIP>"
+        try:
+            comment = labeled_review[1]
+        except IndexError:
+            label = "<SKIP>"
+            comment = "" 
+        train_labels.append(label)
+        train_comments.append(comment)
+
+test_comments = []
+with open('testdatahw1.txt') as file_reader:
+    lines = file_reader.readlines()
+    for line in lines:
+        test_comments.append(line.strip())
+
+train_dict = {"comment": train_comments, "label": train_labels}
+train_data = pd.DataFrame(train_dict, columns=["comment", "label"]) 
+
+test_dict = {"comment": train_comments}
+x_test = pd.DataFrame(test_comments, columns=["comment"]) 
 
 # split test and eval
 x = train_data["comment"]
@@ -59,7 +87,7 @@ model_d2v = Doc2Vec(
     alpha=0.005, 
     min_alpha=0.001,
     dbow_words=1, # 0-bow, 1-skip gram 
-    epochs=30)
+    epochs=50)
 
 # step 2: retrieve embeddings from model
 x_train["embeddings"] = x_train["tokens"].apply(lambda row: model_d2v.infer_vector(row))
