@@ -19,10 +19,6 @@ def euclidean_distance(x, y):
 def cosine_similarity(x, y):
     return np.dot(x, y) / (np.linalg.norm(x) * np.linalg.norm(y))
 
-def tsss_similarity(x, y):
-    similarity = tsss.TS_SS()
-    return similarity(x, y)
-
 def print_bad_predictions(row):
     if row["label"] != row["prediction"]:
         print("label: {}, prediction: {}, comment: {}".format(row["label"], row["prediction"], row["comment"]))
