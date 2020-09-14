@@ -7,13 +7,19 @@
 # preprocessing you need on my undisclosed test data
 
 NB_CLASSES=10
+from tensorflow import keras
 import numpy as np
-from keras.utils import np_utils
 
 def processTestData(X, y):
+
+    train_data   = np.load('MNISTXtrain1.npy')
+    train_labels = np.load('MNISTytrain1.npy')
+
+    eval_data    = np.load('MNIST_X_test_1.npy')
+    eval_labels  = np.load('MNIST_y_test_1.npy')
 
     # X preprocessing goes here -- students optionally complete
 
     # y preprocessing goes here.  y_test becomes a ohe
-    y_ohe = np_utils.to_categorical (y, NB_CLASSES)
+    y_ohe = keras.utils.to_categorical (y, NB_CLASSES)
     return X, y_ohe

@@ -4,7 +4,6 @@
 #    NOTE: Submit a different python file for each model
 # -------------------------------------------------
 
-
 import numpy as np
 
 from keras.models import Sequential
@@ -42,7 +41,7 @@ def main():
     X_train = np.load(parms.XFile)
     y_train = np.load(parms.yFile)
 
-    (X_train, y_train) = processTestData(X_train,y_train)
+    (X_train, y_train) = processTestData(X_train, y_train)
 
     print('KERA modeling build starting...')
     ## Build your model here
