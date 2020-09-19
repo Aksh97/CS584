@@ -41,7 +41,7 @@ with open('testdatahw1.txt') as file_reader:
         test_comments.append(line.strip())
 
 x_train    = {"comment": train_comments, "label": train_labels}
-train_data = pd.DataFrame(train_dict, columns=["comment", "label"])
+train_data = pd.DataFrame(x_train, columns=["comment", "label"])
 
 test_dict = {"comment": train_comments}
 x_test = pd.DataFrame(test_comments, columns=["comment"])
