@@ -1,15 +1,9 @@
 import os
 os.environ["CUDA_VISIBLE_DEVICES"]=" "
-os.environ['OPENBLAS_NUM_THREADS'] = '1'
-os.environ['MKL_NUM_THREADS'] = '1'
-# os.environ['TF_CPP_MIN_LOG_LEVEL']="3"
 from sentence_transformers import SentenceTransformer, SentencesDataset, InputExample, losses, evaluation
 from torch.utils.data import DataLoader
-# from pandarallel import pandarallel
 import pandas as pd
 import numpy as np
-
-# pandarallel.initialize()
 
 # https://www.sbert.net/docs/training/overview.html
 
@@ -31,8 +25,8 @@ bad_predictions = bad_predictions.rename(columns={"comment": "bad_comment", "emb
 
 # sample some % of x_train
 x_sample = pd.DataFrame()
-x_sample = x_train.sample(frac=0.2, replace=False, random_state=0)
-x_sample = x_sample.sample(frac=0.1, replace=False, random_state=0).reset_index(drop=True)
+x_sample = x_train.sample(frac=1, replace=False, random_state=0).reset_index(drop=True)
+# x_sample = x_sample.sample(frac=0.1, replace=False, random_state=0).reset_index(drop=True)
 
 def decrease_score(score):
     score = 1 / ( 1.5 + np.exp(np.absolute((10 * score) - 5)))
@@ -79,7 +73,7 @@ print("embedder loaded...")
 
 # define your train dataset, the dataloader, and the train loss
 train_dataset = SentencesDataset(x_sample["input"].tolist(), embedder)
-train_dataloader = DataLoader(train_dataset, shuffle=False, batch_size=1, num_workers=1)
+train_dataloader = DataLoader(train_dataset, shuffle=False, batch_size=4, num_workers=1)
 train_loss = losses.CosineSimilarityLoss(embedder)
 
 # dummy evaluator to make the api work
@@ -90,8 +84,8 @@ evaluator = evaluation.EmbeddingSimilarityEvaluator(sentences1, sentences2, scor
 
 # tune the model
 embedder.fit(train_objectives=[(train_dataloader, train_loss)], 
-    epochs=1, 
-    warmup_steps=100, 
+    epochs=5, 
+    warmup_steps=500, 
     evaluator=evaluator, 
     evaluation_steps=1,
     output_path="fine_tuned_bert")
