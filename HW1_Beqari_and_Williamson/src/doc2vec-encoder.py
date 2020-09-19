@@ -40,27 +40,11 @@ with open('testdatahw1.txt') as file_reader:
     for line in lines:
         test_comments.append(line.strip())
 
-train_dict = {"comment": train_comments, "label": train_labels}
+x_train    = {"comment": train_comments, "label": train_labels}
 train_data = pd.DataFrame(train_dict, columns=["comment", "label"])
 
 test_dict = {"comment": train_comments}
 x_test = pd.DataFrame(test_comments, columns=["comment"])
-
-# split test and eval
-x = train_data["comment"]
-y = train_data["label"]
-
-x_train, x_eval, y_train, y_eval = train_test_split(x, y,
-    test_size=0.2,
-    random_state=0,
-    stratify=train_data["label"])
-
-# keep labels in the same set
-x_train = x_train.to_frame()
-x_train["label"] = y_train
-
-x_eval = x_eval.to_frame()
-x_eval["label"] = y_eval
 
 def paragraph_to_tokens(paragraph):
     try:
@@ -75,11 +59,10 @@ def paragraph_to_tokens(paragraph):
 
 # step 1: convert paragraph to tokens
 x_train["tokens"] = x_train["comment"].parallel_apply(lambda row: paragraph_to_tokens(row))
-x_eval["tokens"]  = x_eval["comment"].parallel_apply(lambda row: paragraph_to_tokens(row))
 x_test["tokens"]  = x_test["comment"].parallel_apply(lambda row: paragraph_to_tokens(row))
 
 # train the vocabolary with all words
-all_tokens = pd.concat([x_train, x_eval, x_test], keys=['tokens'], names=['tokens'])
+all_tokens = pd.concat([x_train, x_test], keys=['tokens'], names=['tokens'])
 
 # doc2vec model
 # docs: https://radimrehurek.com/gensim/models/doc2vec.html
@@ -102,10 +85,8 @@ model_d2v = Doc2Vec(
 
 # retrieve embeddings from model
 x_train["embeddings"] = x_train["tokens"].parallel_apply(lambda row: model_d2v.infer_vector(row))
-x_eval["embeddings"]  = x_eval["tokens"].parallel_apply(lambda row: model_d2v.infer_vector(row))
 x_test["embeddings"]  = x_test["tokens"].parallel_apply(lambda row: model_d2v.infer_vector(row))
 
 # save dataframes to file
 x_train.to_pickle("x_train.pkl")
-x_eval.to_pickle("x_eval.pkl")
 x_test.to_pickle("x_test.pkl")

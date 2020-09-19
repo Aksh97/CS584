@@ -1,18 +1,35 @@
-from sentence_transformers import SentenceTransformer
-from sklearn.model_selection import train_test_split
-from pandarallel import pandarallel
+
 import os
 os.environ["CUDA_VISIBLE_DEVICES"]=" "
 os.environ['TF_CPP_MIN_LOG_LEVEL']="3"
-import tensorflow as tf
-import tensorflow_hub as hub
+from sentence_transformers import SentenceTransformer
 import pandas as pd
 import numpy as np
 
-pandarallel.initialize()
+def cosine_similarity(x1, x2):
+        return np.dot(x1, x2) / (np.linalg.norm(x1) * np.linalg.norm(x2))
 
-# read in data 
-# warning: pandas ignores bad rows
+def knn(rows, row, num_neighbors):
+    distance_and_label = []
+    # calculate distance and keep track of labels
+    for target_row in rows:
+        train_embeddings = np.array(target_row[0])
+        test_embeddings = np.array(row)
+        # distance = euclidean_distance(train_embeddings, test_embeddings)
+        distance = cosine_similarity(train_embeddings, test_embeddings)
+        label = target_row[1]
+        distance_and_label.append([distance, label])
+    # sort the list by distance positional element
+    # save only the k-th specified neigbors
+    # change reverse=False for euclidean distance
+    sorted_distance_and_label = sorted(distance_and_label, key=lambda x: x[0], reverse=True)[:num_neighbors]  
+    # return the mode of the neighbors 
+    knn_labels = [element[1] for element in sorted_distance_and_label]
+    prediction = max(set(knn_labels), key=knn_labels.count)
+    return prediction
+
+# read in data line by line 
+# because pandas ignores bad rows
 train_labels = []
 train_comments = []
 valid_labels = ["+1", "-1"]
@@ -38,35 +55,22 @@ with open('testdatahw1.txt') as file_reader:
         test_comments.append(line.strip())
 
 train_dict = {"comment": train_comments, "label": train_labels}
-train_data = pd.DataFrame(train_dict, columns=["comment", "label"]) 
+x_train = pd.DataFrame(train_dict, columns=["comment", "label"]) 
 
-test_dict = {"comment": train_comments}
+test_dict = {"comment": test_comments} # <-train_comments
 x_test = pd.DataFrame(test_comments, columns=["comment"]) 
 
-# split test and eval
-x = train_data["comment"]
-y = train_data["label"]
-x_train, x_eval, y_train, y_eval = train_test_split(x, y, 
-    test_size=0.2, 
-    random_state=0, 
-    stratify=train_data["label"])
-
-# keep labels in the same set
-x_train = x_train.to_frame()
-x_train["label"] = y_train
-
-x_eval = x_eval.to_frame()
-x_eval["label"] = y_eval
-
 # embedder = SentenceTransformer('distilbert-base-nli-stsb-mean-tokens')
-embedder = SentenceTransformer('bert-large-nli-mean-tokens')
+# embedder = SentenceTransformer('bert-large-nli-mean-tokens')
+embedder = SentenceTransformer('fine_tuned_bert')
+print("embedder loaded...")
 
 # retrieve embeddings from model
-x_train["embeddings"] = x_train["comment"].parallel_apply(lambda row: embedder.encode(row))
-x_eval["embeddings"]  = x_eval["comment"].parallel_apply(lambda row: embedder.encode(row))
-x_test["embeddings"]  = x_test["comment"].parallel_apply(lambda row: embedder.encode(row))
+x_train["embeddings"] = x_train["comment"].apply(lambda row: embedder.encode(row))
+best_num_neighbors = 57 # according to cross-validation
+x_train["prediction"] = x_train["embeddings"].apply(lambda row: knn(x_train[["embeddings", "label"]].values.tolist(), row, best_num_neighbors))
+x_test["embeddings"]  = x_test["comment"].apply(lambda row: embedder.encode(row))
 
-# save dataframes to file
+# # save dataframes to file
 x_train.to_pickle("x_train.pkl")
-x_eval.to_pickle("x_eval.pkl")
 x_test.to_pickle("x_test.pkl")

@@ -22,3 +22,4 @@ HW2_Beqari_and_Williamson/Archive.zip
 HW2_Beqari_and_Williamson/.vscode/settings.json
 HW2_Beqari_and_Williamson/__pycache__/mnist_cnn.cpython-38.pyc
 HW2_Beqari_and_Williamson/__pycache__/mnist.cpython-38.pyc
+*.pkl

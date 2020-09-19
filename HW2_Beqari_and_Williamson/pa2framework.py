@@ -142,7 +142,8 @@ class MnistCNNClassifier():
     def load(self, path):
         self._model = keras.models.load_model(path)
 
-# *** Cross validation with grid search ***
+# add multiple filters
+# source: https://stackoverflow.com/questions/57438922/different-size-filters-in-the-same-layer-with-tensorflow-2-0
 
 class NestedCrossValidation():  
     def __init__(self):
@@ -195,6 +196,3 @@ class NestedCrossValidation():
 
 cv = NestedCrossValidation()
 cv.run()
-
-# siamese
-# https://towardsdatascience.com/one-shot-learning-with-siamese-networks-using-keras-17f34e75bb3d
