@@ -95,9 +95,3 @@ embedder.fit(train_objectives=[(train_dataloader, train_loss)],
     evaluator=evaluator, 
     evaluation_steps=1,
     output_path="fine_tuned_bert")
-
-test_comments = []
-with open('testdatahw1.txt') as file_reader:
-    lines = file_reader.readlines()
-    for line in lines:
-        test_comments.append(line.strip())
