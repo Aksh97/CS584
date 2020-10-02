@@ -1,11 +1,9 @@
 from gensim.summarization.textcleaner import clean_text_by_word
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
-from sklearn.model_selection import train_test_split
 from nltk.corpus import stopwords
 from pandarallel import pandarallel
 import nltk
 import pandas as pd
-import numpy as np
 import multiprocessing
 
 pandarallel.initialize()
@@ -40,18 +38,18 @@ with open('testdatahw1.txt') as file_reader:
     for line in lines:
         test_comments.append(line.strip())
 
-x_train    = {"comment": train_comments, "label": train_labels}
-train_data = pd.DataFrame(x_train, columns=["comment", "label"])
+train_dict = {"comment": train_comments, "label": train_labels}
+x_train = pd.DataFrame(train_dict, columns=["comment", "label"])
 
 test_dict = {"comment": train_comments}
-x_test = pd.DataFrame(test_comments, columns=["comment"])
+x_test = pd.DataFrame(test_dict, columns=["comment"])
 
 def paragraph_to_tokens(paragraph):
     try:
         text_dict = clean_text_by_word(paragraph)
         # try with removed stopwords
-        tokens = [value.token for key, value in text_dict.items() if not value.token in stop_words]
-        # tokens = [value.token for key, value in text_dict.items()]
+        # tokens = [value.token for key, value in text_dict.items() if not value.token in stop_words]
+        tokens = [value.token for key, value in text_dict.items()]
         return tokens
     except TypeError:
         print('warning: nan found in paragraph - {}'.format(paragraph))
@@ -70,7 +68,7 @@ cores = multiprocessing.cpu_count()
 documents = [TaggedDocument(doc, [i]) for i, doc in enumerate(all_tokens["tokens"].tolist())]
 model_d2v = Doc2Vec(
     documents,
-    dm=0,
+    dm=1,
     vector_size=300,
     negative=5,
     hs=0,
@@ -81,7 +79,7 @@ model_d2v = Doc2Vec(
     alpha=0.005,
     min_alpha=0.001,
     dbow_words=1, # 0-bow, 1-skip gram
-    epochs=50)
+    epochs=200)
 
 # retrieve embeddings from model
 x_train["embeddings"] = x_train["tokens"].parallel_apply(lambda row: model_d2v.infer_vector(row))

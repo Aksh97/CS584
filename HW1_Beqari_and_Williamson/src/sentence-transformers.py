@@ -58,15 +58,15 @@ train_dict = {"comment": train_comments, "label": train_labels}
 x_train = pd.DataFrame(train_dict, columns=["comment", "label"]) 
 
 test_dict = {"comment": test_comments} # <-train_comments
-x_test = pd.DataFrame(test_comments, columns=["comment"]) 
+x_test = pd.DataFrame(test_dict, columns=["comment"]) 
 
 # embedder = SentenceTransformer('distilbert-base-nli-stsb-mean-tokens')
-# embedder = SentenceTransformer('bert-large-nli-mean-tokens')
-embedder = SentenceTransformer('fine_tuned_bert')
+embedder = SentenceTransformer('bert-large-nli-mean-tokens')
+# embedder = SentenceTransformer('fine_tuned_bert')
 print("embedder loaded...")
 
 # retrieve embeddings from model
-x_train["embeddings"] = x_train["comment"].apply(lambda row: embedder.encode(row))
+# x_train["embeddings"] = x_train["comment"].apply(lambda row: embedder.encode(row))
 best_num_neighbors = 57 # according to cross-validation
 x_train["prediction"] = x_train["embeddings"].apply(lambda row: knn(x_train[["embeddings", "label"]].values.tolist(), row, best_num_neighbors))
 x_test["embeddings"]  = x_test["comment"].apply(lambda row: embedder.encode(row))

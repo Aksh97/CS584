@@ -2,6 +2,7 @@
 #  author: molloykp (Oct 2019)
 # purpose: Accept a numpy npy file and add Gaussian noise
 #          Parameters:
+#   usage: python3 addNoise.py --inputFile MNISTXtrain1.npy --sigma 0.5 --outputFile MNISTXtrain1_noisy.npy 
 
 import numpy as np
 import argparse

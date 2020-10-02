@@ -14,10 +14,6 @@ import uuid
 
 pandarallel.initialize()
 
-# read in the data
-x_train = pd.read_pickle("x_train.pkl", compression="infer")
-x_test  = pd.read_pickle("x_test.pkl", compression="infer")
-
 class KNNClassifier():  
 
     def __init__(self, num_neighbors=5):
@@ -81,7 +77,6 @@ def run_trials(start_k, end_k, step_k):
         model = KNNClassifier(num_neighbors=k)
         results_skfold = model_selection.cross_val_score(model, x_train, x_train["label"], cv=cv, n_jobs=1)
         accuracy = results_skfold.mean()
-        accuracy_std = results_skfold.std()
         end = time.time()
 
         if accuracy > accuracy_tracker: 
@@ -91,7 +86,11 @@ def run_trials(start_k, end_k, step_k):
         print("current k: {}, best k: {}, best accuracy: {:.3f}, elapsed time: {}".format(k, k_tracker, accuracy_tracker, end - start))
     return k_tracker
 
-best_num_neighbors = run_trials(55, 65, 1)
+# read in the data
+x_train = pd.read_pickle("x_train.pkl", compression="infer")
+x_test  = pd.read_pickle("x_test.pkl", compression="infer")
+
+best_num_neighbors = run_trials(5, 125, 1)
 
 # predict step - uncomment code below
 x_test["prediction"] = x_test["embeddings"].parallel_apply(lambda row: KNNClassifier.knn(x_train[["embeddings", "label"]].values.tolist(), row, 65))
