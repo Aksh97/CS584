@@ -39,10 +39,10 @@ with open('testdatahw1.txt') as file_reader:
         test_comments.append(line.strip())
 
 train_dict = {"comment": train_comments, "label": train_labels}
-x_train = pd.DataFrame(train_dict, columns=["comment", "label"])
+x_train    = pd.DataFrame(train_dict, columns=["comment", "label"])
 
 test_dict = {"comment": train_comments}
-x_test = pd.DataFrame(test_dict, columns=["comment"])
+x_test    = pd.DataFrame(test_dict, columns=["comment"])
 
 def paragraph_to_tokens(paragraph):
     try:
