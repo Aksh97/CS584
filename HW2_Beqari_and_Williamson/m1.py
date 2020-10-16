@@ -1,4 +1,5 @@
 from pa2framework import MnistDNNClassifier
+from sklearn.metrics import classification_report
 import matplotlib.pyplot as plt
 from pa2pre import processTestData
 import numpy as np
@@ -23,7 +24,6 @@ def parseArguments():
 
 def main():
     np.random.seed(1671)
-
     parms = parseArguments()
 
     X_train = np.load(parms.XFile)
