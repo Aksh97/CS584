@@ -1,9 +1,9 @@
-from pa2framework import MnistDNNClassifier
-from sklearn.metrics import classification_report
-import matplotlib.pyplot as plt
+from pa2framework import MnistCNNClassifier, graph_report
+from tensorflow import keras
 from pa2pre import processTestData
 import numpy as np
 import argparse
+
 
 def parseArguments():
     parser = argparse.ArgumentParser(
@@ -24,6 +24,7 @@ def parseArguments():
 
 def main():
     np.random.seed(1671)
+
     parms = parseArguments()
 
     X_train = np.load(parms.XFile)
@@ -34,33 +35,30 @@ def main():
     print('KERA modeling build starting...')
     ## Build your model here
 
-    model = MnistDNNClassifier(
+    model = MnistCNNClassifier(
         epochs=20, 
-        batch_size=26, 
-        nodes=[128, 64, 32], 
-        activation='sigmoid', 
-        dropout=0.2)
+        batch_size=128,
+        filters=[64, 128],
+        kernel=4,
+        pool=2,
+        strategy='pool',
+        dropout=0.5)
     
-    history = model.fit(X_train, y_train, validation_split=0.2, verbose=1).get_history()
+    history = model.fit(X_train, y_train, verbose=1).get_history()
 
-    plt.plot(history.history['accuracy'])
-    plt.plot(history.history['val_accuracy'])
-    plt.title('Model Accuracy')
-    plt.ylabel('accuracy')
-    plt.xlabel('epoch')
-    plt.legend(['train', 'val'], loc='upper left')
-    plt.show()
+    # actual methods used for hw
+    # X_test = np.load("MNIST_X_test_1.npy")
+    # X_test = X_test.astype("float32") / 255
+    # X_test = np.expand_dims(X_test, -1)
 
-    plt.plot(history.history['loss'])
-    plt.plot(history.history['val_loss'])
-    plt.title('model loss')
-    plt.ylabel('loss')
-    plt.xlabel('epoch')
-    plt.legend(['train', 'val'], loc='upper left')
-    plt.show()
+    # y_test = np.load("MNIST_y_test_1.npy")
+    # y_test = keras.utils.to_categorical(y_test, 10)
 
-    ## save your model
-    # model.save_model("mnist_dnn_model")
+    # history = model.fit(X_train, y_train, validation_data=(X_test, y_test), verbose=1).get_history()
+    # graph_report(model, history, X_test_file="MNIST_X_test_1.npy", y_test_file="MNIST_y_test_1.npy")
+
+    # save your model
+    model.save_model(parms.outModelFile)
 
 if __name__ == '__main__':
     main()

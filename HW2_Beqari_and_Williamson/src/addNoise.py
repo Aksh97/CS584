@@ -5,6 +5,7 @@
 #   usage: python3 addNoise.py --inputFile MNISTXtrain1.npy --sigma 0.5 --outputFile MNISTXtrain1_noisy.npy 
 
 import numpy as np
+from pa2framework import print_greyscale
 import argparse
 
 def parseArguments():
@@ -30,18 +31,22 @@ def main():
 
     inMatrix = np.load(parms.inputFile)
 
+    print(inMatrix[0].shape)
+
     # matrix must be floating point to add values
     # from the Gaussian
-    inMatrix = inMatrix.astype('float32')
-    inMatrix += np.random.normal(0,parms.sigma,(inMatrix.shape))
-    inMatrix = inMatrix.astype('int')
+    outMatrix = inMatrix.astype('float32')
+    outMatrix += np.random.normal(0,parms.sigma,(inMatrix.shape))
+    outMatrix = outMatrix.astype('int')
 
     # noise may have caused values to go outside their allowable
     # range
-    inMatrix[inMatrix < 0] = 0
-    inMatrix[inMatrix > 255] = 255
+    outMatrix[outMatrix < 0] = 0
+    outMatrix[outMatrix > 255] = 255
 
-    np.save(parms.outputFile,inMatrix)
+    print_greyscale(inMatrix[0], inMatrix[0], width=28, height=28)
+
+    np.save(parms.outputFile, outMatrix)
 
 if __name__ == '__main__':
     main()

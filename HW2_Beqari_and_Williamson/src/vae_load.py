@@ -17,7 +17,6 @@ vae = load_model('vae_model')
 
 # (x_train, _), (x_test, _) = keras.datasets.mnist.load_data()
 
-
 x_test = np.load("MNISTXtrain1_noisy_2.5.npy")
 
 test_input = np.expand_dims(x_test[1], -1).astype("float32") / 255

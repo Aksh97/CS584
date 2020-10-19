@@ -8,6 +8,9 @@ import numpy as np
 from numpy import mean, std
 from sklearn.model_selection import KFold
 from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import classification_report, confusion_matrix
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 class MnistVAETransformer():
@@ -40,7 +43,7 @@ class MnistDNNClassifier():
         self._input_shapes = (28, 28, 1)
         self._accuracy = keras.metrics.CategoricalAccuracy()
 
-    def fit(self, x, y=None, validation_split=None, verbose=0):
+    def fit(self, x, y=None, validation_split=None, validation_data=None, verbose=0):
 
         # normalize images to the [0, 1] range
         x_train = x.astype("float32") / 255
@@ -70,6 +73,7 @@ class MnistDNNClassifier():
             batch_size=self._batch_size, 
             epochs=self._epochs, 
             validation_split=validation_split,
+            validation_data=validation_data, 
             verbose=verbose,
             workers=-1)
         return self
@@ -269,6 +273,7 @@ class MnistTwoBranchCNNClassifier():
 
         self._model = keras.Model(inputs=[input1, input2], outputs=outputs, name="experimental")
         self._model.compile(loss="categorical_crossentropy", optimizer="adam", metrics=["accuracy"])
+
         self._history = self._model.fit([x_train, x_train], y_train, 
             batch_size=self._batch_size, 
             epochs=self._epochs, 
@@ -284,7 +289,7 @@ class MnistTwoBranchCNNClassifier():
     def predict(self, x):
         x_predict = x.astype("float32") / 255
         x_predict = np.expand_dims(x_predict, -1)
-        prediction = self._model.predict(x_predict)
+        prediction = self._model.predict_on_batch(x=[x_predict, x_predict])[0]
         prediction = np.argmax(prediction, axis=1)
         return(prediction)
 
@@ -357,3 +362,50 @@ def print_greyscale(pixels_1, pixels_2, width=28, height=28):
     for l in range(height):
         line_pixels = np.concatenate((pixels_1[l * width:(l+1) * width], pixels_2[l * width:(l+1) * width]), axis=None)
         print(''.join(get_single_greyscale(p) for p in line_pixels))
+
+def graph_report(model, history, X_test_file, y_test_file):
+
+    plt.plot(history.history['accuracy'])
+    plt.plot(history.history['val_accuracy'])
+    plt.title('Model Accuracy')
+    plt.ylabel('accuracy')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'val'], loc='upper left')
+    plt.show()
+
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.title('Model Loss')
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'val'], loc='upper left')
+    plt.show()
+
+    y_pred = model.predict(np.load(X_test_file))
+    y_true = np.load(y_test_file)
+    report = classification_report(y_true, y_pred, output_dict=True)
+    conf_matrix = confusion_matrix(y_true, y_pred).T
+  
+    labels    = [key for key in report.keys()][:10]
+    precision = [report[key]['precision'] for key in labels]
+    recall    = [report[key]['recall'] for key in labels]
+    f1_score  = [report[key]['f1-score'] for key in labels]
+
+    index = np.arange(len(labels))
+    width = 0.25       
+    plt.bar(index, precision, width, label='Precision')
+    plt.bar(index + width, recall, width, label='Recall')
+    plt.bar(index + 2 * width, f1_score, width, label='F1 Score')
+
+    plt.ylabel('Scores %')
+    plt.title('Classification Report')
+
+    plt.xticks(index + width, labels)
+    plt.legend(loc='best')
+    plt.show()
+
+    sns.set()
+    ax = sns.heatmap(conf_matrix, annot=True, fmt='.1f', linewidth=0.5)
+    plt.xlabel('True Class')
+    plt.ylabel('Predicted Class')
+    plt.show()
