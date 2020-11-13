@@ -32,10 +32,20 @@ class ODENetwork():
     def gaussian(self, x, beta=2):
         return tf.keras.backend.exp(-tf.keras.backend.pow(beta * x, 2))
 
-    def create_model(self):
+    # def create_model(self):
+    #     inputs = keras.Input(shape=(1,))
+    #     l1 = layers.Dense(1024, activation=self.gaussian)(inputs)
+    #     outputs = layers.Dense(1, activation="linear")(l1)
+    #     self.model = keras.Model(inputs=inputs, outputs=outputs, name="experimental")
+    #     print(self.model.summary())
+    #     return self
+
+    def create_model(self): 
         inputs = keras.Input(shape=(1,))
-        l1 = layers.Dense(1024, activation=self.gaussian)(inputs)
-        outputs = layers.Dense(1, activation="linear")(l1)
+        l1 = layers.Dense(10, activation="sigmoid")(inputs)
+        l2 = layers.Dense(10, activation="sigmoid")(l1)
+        l3 = layers.Dense(10, activation="sigmoid")(l2)
+        outputs = layers.Dense(1, activation="linear")(l3)
         self.model = keras.Model(inputs=inputs, outputs=outputs, name="experimental")
         print(self.model.summary())
         return self
@@ -69,15 +79,16 @@ class ODENetwork():
                     lambda x: self.loss(x[0], x[1], x[2], x[3], t_0), 
                     (t, u, u_t, u_tt), 
                     dtype=tf.double)
-                loss = tf.reduce_mean(loss, axis=-1)
+                # loss = tf.reduce_mean(loss, axis=-1)
+                loss = tf.reduce_mean(loss)
                    
         grads = tape_ord_1.gradient(loss, self.model.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.model.trainable_weights))
         return loss
 
     def train(self):
-        epochs = 3000
-        batch_size = 25 # len(self.get_data())
+        epochs = 10000
+        batch_size = len(self.get_data())
         t_0  = tf.constant(np.array([[0.0]]), dtype=tf.double)
    
         for epoch in range(epochs):            

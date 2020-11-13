@@ -25,21 +25,26 @@ class ODENetwork():
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
         # self.optimizer = keras.optimizers.SGD(learning_rate=0.05)
         self.history = []
+
+        self.xmin = -5.0
+        self.xmax =  5.0
+        self.tmin =  0.0
+        self.tmax =  5.0
     
     def get_data(self):
-        x = np.linspace(-5.0, 5.0, num=1000)
-        t = np.linspace(0.0, 5, num=1000)
+        x = np.linspace(self.xmin, self.xmax, num=1000)
+        t = np.linspace(self.tmin, self.tmax, num=1000)
         xx, tt = np.meshgrid(x, t)
         x_train = np.column_stack((xx.ravel(), tt.ravel()))
         return x, t, xx, tt, x_train
     
     @tf.function
-    def gaussian(self, x, beta=-2):
+    def gaussian(self, x, beta=2):
         return tf.keras.backend.exp(-tf.keras.backend.pow(beta * x, 2))
 
     def create_model(self):
         inputs = keras.Input(shape=(2, ))
-        l1 = layers.Dense(1024, activation=self.gaussian)(inputs)
+        l1 = layers.Dense(1024, activation="sigmoid")(inputs) # self.gaussian
         outputs = layers.Dense(1, activation="linear")(l1)
         self.model = keras.Model(inputs=inputs, outputs=outputs, name="experimental")
         print(self.model.summary())
@@ -52,14 +57,43 @@ class ODENetwork():
 
     @tf.function
     def loss(self, point, u, d2u_dxdt):
-        point0 = tf.expand_dims(tf.math.multiply(
-            tf.cast(point, dtype=tf.double), 
-            tf.constant(np.array([1, 0]), dtype=tf.double)), 
+        point = tf.cast(point, dtype=tf.double)
+        x = point[0]
+        t = point[1]
+        # tmin
+        point_00 = tf.expand_dims(tf.math.multiply(
+            point, 
+            tf.constant(np.array([0, 0]), dtype=tf.double)), 
             axis=0)
-        u_x0  = tf.cast(self.model(point0, training=False), dtype=tf.double)  
-        x = tf.cast(point[0], dtype=tf.double)
-        t = tf.cast(point[1], dtype=tf.double)
-        loss = tf.keras.backend.abs(u_x0 - 1) + tf.keras.backend.abs(d2u_dxdt + u * self.k(x, t))
+        u_00  = tf.cast(self.model(point_00, training=False), dtype=tf.double)
+        # other t0
+        point_xt0 = tf.expand_dims(tf.math.multiply(
+            point, 
+            tf.constant(np.array([1, 0]), dtype=tf.double)), axis=0)
+        u_xt0 = tf.cast(self.model(point_xt0, training=False), dtype=tf.double)
+        # xmin
+        point_x = tf.math.multiply(
+            point, 
+            tf.constant(np.array([0, 1]), dtype=tf.double))
+        point_xmin = tf.math.add(
+            point_x, 
+            tf.constant(np.array([self.xmin, 0]), dtype=tf.double))
+        point_xmin = tf.expand_dims(point_xmin, axis=0)
+        u_xmint  = tf.cast(self.model(point_xmin, training=False), dtype=tf.double)  
+        # xmax
+        point_xmax = tf.math.add(
+            point_x, 
+            tf.constant(np.array([self.xmax, 0]), dtype=tf.double))
+        point_xmax = tf.expand_dims(point_xmax, axis=0)
+        u_xmaxt  = tf.cast(self.model(point_xmax, training=False), dtype=tf.double) 
+
+        loss = tf.keras.backend.abs(u_00 - 1) +     \
+            tf.keras.backend.abs(u_xt0)   +         \
+            tf.keras.backend.abs(u_xmint) +         \
+            tf.keras.backend.abs(u_xmaxt) +         \
+            tf.keras.backend.abs(
+                tf.keras.backend.minimum(u, 0.0)) + \
+            tf.keras.backend.abs(d2u_dxdt + u * self.k(x, t))
         return loss
     
     @tf.function
@@ -100,13 +134,15 @@ class ODENetwork():
         return loss
 
     def train(self):
-        epochs = 3
-        batch_size = len(self.get_data())
-        # t_0  = tf.constant(np.array([[0.0]]), dtype=tf.double)
-
+        epochs = 25
+        batch_size = 128 # len(self.get_data()[4])
+        print("batch size: ", batch_size)
+        
         x, t, xx, tt, x_train = self.get_data()
         xt_dataset = tf.data.Dataset.from_tensor_slices(x_train)
         xt_dataset = xt_dataset.shuffle(buffer_size=1024, seed=1234).batch(batch_size)
+
+        print("dataset length: ", x_train.shape)
 
         for epoch in range(epochs):            
   
@@ -149,7 +185,7 @@ def main():
     # Plot the surface.
     surf = ax.plot_surface(tt, xx, z, cmap=cm.viridis, linewidth=0, antialiased=False)
     # Customize the z axis.
-    ax.set_zlim(-1.01, 1.01)
+    ax.set_zlim(-0.01, 1.01)
     ax.zaxis.set_major_locator(LinearLocator(10))
     ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
     # Add a color bar which maps values to colors.
@@ -161,6 +197,14 @@ def main():
     plt.xlabel('t')
     plt.contourf(t, x, z)
     plt.show()
+
+    # name = "pde_0"
+    # dirname = os.path.dirname(__file__)
+    # save_path = os.path.join(dirname, name)
+    # os.mkdir(save_path) 
+
+    # np.save(save_path + "/" + name, np.array([t, x, tt, xx, xx, z]))
+    # ode_net.model.save(save_path + "/" + name)
 
 if __name__ == '__main__':
     main()
