@@ -19,8 +19,8 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 class ODENetwork(tf.keras.Model):
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-    param_opt = tf.keras.optimizers.Adam(learning_rate=2) #, clipnorm=1.0
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
+    param_opt = tf.keras.optimizers.Adam(learning_rate=0.05) #, clipnorm=1.0
 
     t_0  = tf.constant(np.array([[0.0]]), dtype=tf.double)
     ic_t = tf.constant(3, dtype=tf.double)
@@ -54,6 +54,12 @@ class ODENetwork(tf.keras.Model):
         return tf.keras.backend.exp(-tf.keras.backend.pow(beta * x, 2))
 
     @tf.function
+    def loss_total(self, u, f_t, f_tt, u_exact):
+        loss_f = tf.keras.backend.square(f_tt + self.b * f_t + self.k * u)
+        loss_u = tf.keras.backend.square(u_exact - u)
+        return loss_f + loss_u + self.loss_ic()
+
+    @tf.function
     def loss_f(self, f, f_t, f_tt):
         loss_f = tf.keras.backend.square(f_tt + self.b * f_t + self.k * f)
         return loss_f
@@ -70,44 +76,48 @@ class ODENetwork(tf.keras.Model):
     @tf.function
     def loss_u(self, u_pred, u_exact):
         loss_u = tf.keras.backend.square(u_exact - u_pred)
-        return loss_u + self.loss_ic()
+        return loss_u
 
     def train_step(self, data):
-        t, t_observed, x_observed = data
+        t_observed, x_observed = data
+        x_observed = tf.cast(tf.expand_dims(x_observed, axis=-1), dtype=tf.double)
         with tf.GradientTape(persistent=True) as tape_ord_2:
-            tape_ord_2.watch(t)
+            tape_ord_2.watch(t_observed)
 
             with tf.GradientTape(persistent=True) as tape_ord_1:
-                tape_ord_1.watch(t)
+                tape_ord_1.watch(t_observed)
                 tape_ord_1.watch(self.b)
                 tape_ord_1.watch(self.k)
 
-                f = tf.cast(self(t, training=False), dtype=tf.double)
-                f_t = tape_ord_1.gradient(f, t)
-                f_tt = tape_ord_2.gradient(f_t, t)
-                loss_f = tf.keras.backend.map_fn(
-                    lambda x: self.loss_f(x[0], x[1], x[2]),
-                    (f, f_t, f_tt),
-                    dtype=tf.double)
-                loss_f = tf.reduce_mean(loss_f)
+                u = tf.cast(self(t_observed, training=False), dtype=tf.double)
+                f_t = tape_ord_1.gradient(u, t_observed)
+                f_tt = tape_ord_2.gradient(f_t, t_observed)
+
+                # loss_f = tf.keras.backend.map_fn(
+                #     lambda x: self.loss_f(x[0], x[1], x[2]),
+                #     (u, f_t, f_tt),
+                #     dtype=tf.double)
+                # loss_f = tf.reduce_mean(loss_f)
                 # loss_ic = tf.reduce_mean(self.loss_ic()) 
                 
-                u = tf.cast(self(t_observed, training=False), dtype=tf.double)
-                print("u: ", u)
-                x_observed = tf.cast(tf.expand_dims(x_observed, axis=-1), dtype=tf.double)
-                loss_u = tf.keras.backend.map_fn(
-                    lambda x: self.loss_u(x[0], x[1]),
-                    (u, x_observed),
-                    dtype=tf.double)
-                loss_u = tf.reduce_mean(loss_u)
+                # loss_u = tf.keras.backend.map_fn(
+                #     lambda x: self.loss_u(x[0], x[1]),
+                #     (u, x_observed),
+                #     dtype=tf.double)
+                # loss_u = tf.reduce_mean(loss_u)
 
                 # loss = loss_f + loss_ic + loss_u
-                loss = loss_f + loss_u
+
+                loss_total = tf.keras.backend.map_fn(
+                    lambda x: self.loss_total(x[0], x[1], x[2], x[3]),
+                    (u, f_t, f_tt, x_observed),
+                    dtype=tf.double)
+                loss = tf.reduce_mean(loss_total, axis=-1)
 
         grad_b = tape_ord_1.gradient(loss, self.b)
         grad_k = tape_ord_1.gradient(loss, self.k)
-        self.param_opt.apply_gradients(zip([grad_b], [self.b]))
-        self.param_opt.apply_gradients(zip([grad_k], [self.k]))
+        self.optimizer.apply_gradients(zip([grad_b], [self.b]))
+        self.optimizer.apply_gradients(zip([grad_k], [self.k]))
 
         grads = tape_ord_1.gradient(loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights), experimental_aggregate_gradients=False)
@@ -121,9 +131,8 @@ class ODENetwork(tf.keras.Model):
 
 def main():
 
-    f_batch_size = 25
-    u_batch_size = 25
-    epochs     = 1000
+    batch_size = 5
+    epochs     = 20000
 
     inputs = keras.Input(shape=(1,))
     l1 = layers.Dense(50, activation="sigmoid")(inputs)
@@ -139,18 +148,15 @@ def main():
     x_exact                = ODENetwork.exact(t_train)
     t_observed, x_observed = ODENetwork.observed(t_index, t_train, x_exact)
 
-    train_ds = tf.data.Dataset.from_tensor_slices(t_train)
-    train_ds = train_ds.shuffle(buffer_size=1024).batch(f_batch_size)
-    
     t_obs_ds = tf.data.Dataset.from_tensor_slices(t_observed)
     t_obs_ds = t_obs_ds.map(lambda x: tf.cast(x, dtype=tf.double))
-    t_obs_ds = t_obs_ds.batch(u_batch_size)
+    t_obs_ds = t_obs_ds.batch(batch_size)
 
     x_obs_ds = tf.data.Dataset.from_tensor_slices(x_observed)
     x_obs_ds = x_obs_ds.map(lambda x: tf.cast(x, dtype=tf.double))
-    x_obs_ds = x_obs_ds.batch(u_batch_size)
+    x_obs_ds = x_obs_ds.batch(batch_size)
 
-    diffq_ds = tf.data.Dataset.zip((train_ds, t_obs_ds, x_obs_ds))
+    diffq_ds = tf.data.Dataset.zip((t_obs_ds, x_obs_ds))
     diffq_ds = diffq_ds.cache()
 
     history = model.fit(
