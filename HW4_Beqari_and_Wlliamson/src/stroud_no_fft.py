@@ -43,10 +43,6 @@ class StdOUDClassifier():
         return points_df
 
     @staticmethod
-    def fft_magnitude(data):
-        return np.abs(np.fft.fft(data))
-
-    @staticmethod
     def calc_distance(point, points):
         return [[i, dist.euclidean(point, p)] for i, p in enumerate(points)]
 
@@ -68,19 +64,12 @@ class StdOUDClassifier():
         return (1 / minPts) * np.sum([(lrd_p / lrd) for lrd_p in lrds])
 
     @staticmethod
-    def fft(points_df):
-        points_df = points_df.copy(deep=True)
-        points_df["fft"] = points_df["points"].apply(
-            lambda row: StdOUDClassifier.fft_magnitude(row))
-        return points_df
-
-    @staticmethod
-    def distance_from_fft(points_df, relative_df=None):
+    def distance(points_df, relative_df=None):
         points_df = points_df.copy(deep=True)
         if relative_df is None: relative_df = points_df
-        points_df["distance"] = points_df["fft"].apply(
+        points_df["distance"] = points_df["points"].apply(
             lambda row: StdOUDClassifier.calc_distance(
-                row, relative_df["fft"].tolist()))
+                row, relative_df["points"].tolist()))
         return points_df
 
     @staticmethod
@@ -112,9 +101,7 @@ class StdOUDClassifier():
 
     @staticmethod
     def lof_train_step(train_df, k):
-        points_df = StdOUDClassifier.fft(train_df)
-        points_df = StdOUDClassifier.distance_from_fft(points_df,
-                                                       relative_df=None)
+        points_df = StdOUDClassifier.distance(train_df, relative_df=None)
         points_df = StdOUDClassifier.reachability_distance(points_df, k=k)
         points_df = StdOUDClassifier.local_reachability_density(points_df)
         points_df = StdOUDClassifier.local_outlier_factor(points_df,
@@ -125,9 +112,7 @@ class StdOUDClassifier():
 
     @staticmethod
     def lof_test_step(test_df, train_df, k):
-        points_df = StdOUDClassifier.fft(test_df)
-        points_df = StdOUDClassifier.distance_from_fft(points_df,
-                                                       relative_df=train_df)
+        points_df = StdOUDClassifier.distance(test_df, relative_df=train_df)
         points_df = StdOUDClassifier.reachability_distance(points_df, k=k)
         points_df = StdOUDClassifier.local_reachability_density(points_df)
         points_df = StdOUDClassifier.local_outlier_factor(points_df,
@@ -395,8 +380,8 @@ def main():
     pred_model = StdOUDClassifier(k=k_tracker)
     pred_model.fit(points_df)
     points_test_df = pred_model.predict(points_test_df)
-    
-    pred_model.x_test[["p"]].to_csv(r'anomaly_fft_mag.txt', header=None, index=None, sep=' ', mode='w')
+
+    pred_model.x_test[["p"]].to_csv(r'anomaly_no_fft.txt', header=None, index=None, sep=' ', mode='w')
 
 
     # 5. visualize the predictions with PCA
