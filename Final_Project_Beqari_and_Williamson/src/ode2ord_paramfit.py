@@ -13,13 +13,45 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 # example:
 #   x" + 14x' + 49x = 0
+#   x" + bx' + kx = 0
 #   x(0)  = 0
 #   x'(0) = -3
 #   x(t) = −3te^−7t
 
+class CustomCallback(keras.callbacks.Callback):
+
+    def on_train_batch_end(self, batch, logs=None):
+
+        t = logs["t"]
+        x = logs["x"]
+
+        self.model.axs[0].clear()
+        self.model.fig.suptitle("b={}, k={}".format(round(logs["b"], 3), round(logs["k"], 3)))
+        # self.model.axs[0].title("b={}, k={}".format(round(logs["b"], 3), round(logs["k"], 3)))
+        self.model.axs[0].scatter([0.0, 0.0, 1.0, 1.0], [0.1, -0.25, 0.1, -0.25], c='red', marker="+")
+        self.model.axs[0].scatter(t, x)
+        self.model.axs[0].scatter(logs["t_train"], self.model.predict(logs["t_train"]))
+        plt.pause(0.05)
+
+    def on_epoch_end(self, epoch, logs=None):
+
+        self.model.axs[1].scatter(epoch, logs['loss'])
+        self.model.axs[1].scatter(epoch, logs['loss_f'])
+        self.model.axs[1].scatter(epoch, logs['loss_ic'])
+        self.model.axs[1].scatter(epoch, logs['loss_u'])
+        # plt.title('Model Loss')
+        # self.model.axs[1].ylabel('loss')
+        # self.model.axs[1].xlabel('epoch')
+        # self.model.axs[1].ylim(0, 2)
+        self.model.axs[1].legend(['total', 'f', 'ic', 'u'], loc='upper right')
+        plt.pause(0.05)
+
+
+
 class ODENetwork(tf.keras.Model):
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.00001)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.005)
+    # param_opt = tf.keras.optimizers.SGD(learning_rate=0.05)
 
     t_0  = tf.constant(np.array([[0.0]]), dtype=tf.double)
     ic_t = tf.constant(3, dtype=tf.double)
@@ -31,6 +63,13 @@ class ODENetwork(tf.keras.Model):
     loss_ic_trckr = tf.keras.metrics.Mean(name="loss_ic")
     loss_u_trckr  = tf.keras.metrics.Mean(name="loss_u")
 
+    fig, axs = plt.subplots(2)
+    # plt.autoscale(enable=False)
+    plt.show(block=False)
+    plt.pause(2)
+
+    t_train = np.arange(0, 1, 0.0001)
+    
     @staticmethod 
     def data(min, max, dt):
         t_train = np.arange(min, max, dt)
@@ -67,7 +106,7 @@ class ODENetwork(tf.keras.Model):
         self.loss_f_trckr.update_state(loss_f)
         self.loss_ic_trckr.update_state(loss_ic)
         self.loss_u_trckr.update_state(loss_u)
-        return 0.5 * loss_f + loss_ic + loss_u
+        return loss_f + loss_ic + loss_u
 
     @tf.function
     def loss_f(self, f, f_t, f_tt):
@@ -113,7 +152,7 @@ class ODENetwork(tf.keras.Model):
         grad_b = tape_ord_1.gradient(loss, self.b)
         grad_k = tape_ord_1.gradient(loss, self.k)
         self.optimizer.apply_gradients(zip([grad_b], [self.b]))
-        self.optimizer.apply_gradients(zip([grad_k], [self.k]))
+        self.optimizer.apply_gradients(zip([grad_k], [self.k])) 
 
         grads = tape_ord_1.gradient(loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
@@ -123,7 +162,12 @@ class ODENetwork(tf.keras.Model):
             "loss": self.loss_tracker.result(), 
             "loss_f": self.loss_f_trckr.result(),
             "loss_ic": self.loss_ic_trckr.result(), 
-            "loss_u": self.loss_u_trckr.result()}
+            "loss_u": self.loss_u_trckr.result(),
+            "t": t_observed,
+            "x": tf.keras.backend.squeeze(x_observed, axis=1),
+            "b": self.b,
+            "k": self.k,
+            "t_train": self.t_train}
     
     @property
     def metrics(self):
@@ -135,8 +179,12 @@ class ODENetwork(tf.keras.Model):
 
 def main():
 
-    batch_size = 5
-    epochs     = 1
+    t_index, t_train       = ODENetwork.data(0, 1, 0.0001)
+    x_exact                = ODENetwork.exact(t_train)
+    t_observed, x_observed = ODENetwork.observed(t_index, t_train, x_exact, mu=0, sigma=0.05, points=2000)
+
+    batch_size = 5 # len(t_train)
+    epochs     = 5000 # 100000
 
     inputs = keras.Input(shape=(1,))
     l1 = layers.Dense(50, activation="sigmoid")(inputs)
@@ -147,11 +195,6 @@ def main():
 
     print(model.summary())
     model.compile()
-
-    t_index, t_train       = ODENetwork.data(0, 1, 0.0001)
-    x_exact                = ODENetwork.exact(t_train)
-    t_observed, x_observed = ODENetwork.observed(
-        t_index, t_train, x_exact, mu=0, sigma=0.05, points=2000)
 
     t_obs_ds = tf.data.Dataset.from_tensor_slices(t_observed)
     t_obs_ds = t_obs_ds.map(lambda x: tf.cast(x, dtype=tf.double))
@@ -170,8 +213,8 @@ def main():
         diffq_ds,
         epochs=epochs, 
         workers=-1,
-        verbose=1,
-        callbacks=[tf.keras.callbacks.TerminateOnNaN()])
+        verbose=0,
+        callbacks=[tf.keras.callbacks.TerminateOnNaN(), CustomCallback()])
 
     print("\n b: {}, k: {}".format(model.b.numpy(), model.k.numpy()))
 
