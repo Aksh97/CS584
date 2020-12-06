@@ -57,7 +57,7 @@ class MonitorCallback(keras.callbacks.Callback):
         self.model.axs[1].plot(loss_u)
         self.model.axs[1].set_xlabel('Epoch')
         self.model.axs[1].set_ylabel('Error')
-        # self.model.axs[1].set_ylim(0.0, 0.02)
+        self.model.axs[1].set_ylim(0.0, 10.0)
         self.model.axs[1].legend(['loss_f', 'loss_u'], loc='upper right')
         plt.pause(0.01)
 
@@ -162,8 +162,6 @@ class ODENetwork(tf.keras.Model):
                 loss_f = tf.reduce_mean(loss_f, axis=-1)
                 loss_u = tf.reduce_mean(self.loss_u(t_observed, x_observed), axis=-1)
 
-                # loss = loss_f + loss_u
-
                 loss = tf.keras.backend.square(self.lam) * loss_f + (self.one - tf.keras.backend.square(self.lam)) * loss_u
 
         self.loss_f_trckr.update_state(loss_f)
@@ -174,7 +172,7 @@ class ODENetwork(tf.keras.Model):
         self.optimizer.apply_gradients(zip([grad_b], [self.b]))
         self.optimizer.apply_gradients(zip([grad_k], [self.k]))
 
-        grads = tape_ord_1.gradient(loss_u, self.trainable_weights)
+        grads = tape_ord_1.gradient(loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
 
         grad_lam = tape_ord_1.gradient(loss, self.lam)

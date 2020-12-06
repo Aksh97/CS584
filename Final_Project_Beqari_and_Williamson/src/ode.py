@@ -179,7 +179,7 @@ class ODENetwork(tf.keras.Model):
         self.optimizer.apply_gradients(zip([grad_b], [self.b]))
         self.optimizer.apply_gradients(zip([grad_k], [self.k]))
 
-        grads = tape_ord_1.gradient(loss_u, self.trainable_weights)
+        grads = tape_ord_1.gradient(loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
 
         grad_lam = tape_ord_1.gradient(loss, self.lam)
