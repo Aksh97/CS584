@@ -80,7 +80,7 @@ class MonitorCallback(keras.callbacks.Callback):
         self.model.ax1.set_xlabel("Epoch")
         self.model.ax1.set_ylabel("Error")
         # self.model.axs[1].set_ylim(0.0, 0.02)
-        self.model.ax1.legend(["loss_f", "loss_ic", "loss_u"], loc="upper right")
+        self.model.ax1.legend(['loss_f', 'loss_ic'], loc='upper right')
         plt.pause(0.01)
 
 
@@ -171,6 +171,7 @@ class ODENetwork(tf.keras.Model):
 
     @tf.function
     def loss_ic(self, point):
+        t = point[1]
         point_x0 = tf.math.multiply(point, tf.constant(np.array([1, 0]), dtype=tf.double))
         point_x0 = tf.expand_dims(point_x0, axis=0)
 
@@ -185,7 +186,7 @@ class ODENetwork(tf.keras.Model):
         point_1t = tf.math.add(point_1t, tf.constant(np.array([1, 0]), dtype=tf.double))
         point_1t = tf.expand_dims(point_1t, axis=0)
 
-        ic_x = tf.cast(self.two * tf.keras.backend.sin(self.pi * point[1]), dtype=tf.double)
+        ic_x = tf.cast(self.two * tf.keras.backend.sin(self.pi * t), dtype=tf.double)
 
         with tf.GradientTape(persistent=True) as tape_ord_1:
             tape_ord_1.watch(point_1t)
@@ -262,10 +263,10 @@ def main():
     batch_size = 25  # len(xt_train)
     epochs = 1000  # 100000
 
-    inputs = keras.Input(shape=(2,))
-    l1 = layers.Dense(100, activation="sigmoid")(inputs)
-    l2 = layers.Dense(100, activation="sigmoid")(l1)
-    l3 = layers.Dense(100, activation="sigmoid")(l2)
+    inputs = keras.Input(shape=(2, ))
+    l1 = layers.Dense(50, activation="sigmoid")(inputs)
+    l2 = layers.Dense(50, activation="sigmoid")(l1)
+    l3 = layers.Dense(50, activation="sigmoid")(l2)
     outputs = layers.Dense(1, activation="linear")(l3)
     model = ODENetwork(inputs, outputs)
 
@@ -273,7 +274,6 @@ def main():
     model.compile()
 
     xt_ds = tf.data.Dataset.from_tensor_slices(xt_train)
-    # xt_ds = xt_ds.map(lambda x: tf.cast(x, dtype=tf.double))
     xt_ds = xt_ds.shuffle(len(xt_train), seed=123)
     xt_ds = xt_ds.batch(batch_size)
     xt_ds = xt_ds.cache()
@@ -286,29 +286,7 @@ def main():
         callbacks=[tf.keras.callbacks.TerminateOnNaN(), MonitorCallback()],
     )
 
-    # print("\n b: {}, k: {}".format(model.b.numpy(), model.k.numpy()))
-
-    # plt.plot(history.history['loss'])
-    # plt.plot(history.history['loss_f'])
-    # plt.plot(history.history['loss_ic'])
-    # plt.plot(history.history['loss_u'])
-    # plt.title('Model Loss')
-    # plt.ylabel('loss')
-    # plt.xlabel('epoch')
-    # plt.ylim(0, 2)
-    # plt.legend(['total', 'f', 'ic', 'u'], loc='upper right')
-    # plt.show()
-
-    # fig_a = plt.figure()
-    # ax1 = fig_a.add_subplot(111)
-    # ax1.scatter(t_observed, x_observed, s=10, c='red', marker="o", label='sample')
-    # ax1.scatter(t_train, x_exact, s=10, c='blue', marker="s", label='exact')
-    # ax1.scatter(t_train, model.predict(t_train), s=10, c='orange', marker="s", label='approx.')
-    # plt.legend(loc='lower right')
-    # plt.show()
-
     # model.save('ode2ord_paramfit.h5')
-
 
 if __name__ == "__main__":
     main()
