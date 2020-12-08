@@ -40,7 +40,7 @@ class MonitorCallback(keras.callbacks.Callback):
                                             edgecolor='blue')
         surf0._facecolors2d=surf0._facecolors3d
         surf0._edgecolors2d=surf0._edgecolors3d
-        surf1 = self.model.ax1.plot_surface(
+        surf1 = self.model.ax0.plot_surface(
             self.model.tt,
             self.model.xx,
             np.asarray(self.model.psi_predict(self.model.xt_train)).reshape(
@@ -71,7 +71,6 @@ class MonitorCallback(keras.callbacks.Callback):
         plt.pause(0.01)
 
         loss_f  = self.model.hist['loss_f']
-
         loss_f.append(logs['loss_f'])
 
         self.model.ax1.clear()
@@ -98,9 +97,8 @@ class ODENetwork(tf.keras.Model):
     }
 
     fig = plt.figure()
-    ax0 = fig.add_subplot(221, projection='3d')
-    ax1 = fig.add_subplot(223, projection='3d')
-    ax2 = fig.add_subplot(222)
+    ax0 = fig.add_subplot(121, projection='3d')
+    ax1 = fig.add_subplot(122)
     plt.subplots_adjust(top=0.90, hspace = 0.35)
     mng = plt.get_current_fig_manager()
     mng.resize(*mng.window.maxsize())
@@ -115,6 +113,7 @@ class ODENetwork(tf.keras.Model):
     x = np.linspace(xmin, xmax, num=100)
     xx, tt = np.meshgrid(x, t)
     xt_train = np.column_stack((xx.ravel(), tt.ravel()))
+
     z = np.sin(np.pi * xt_train[:,1]) * np.power(xt_train[:,0], 2)
     z = np.reshape(z, (len(x), len(t)))
 
@@ -132,10 +131,28 @@ class ODENetwork(tf.keras.Model):
         return f_exact
 
     @tf.function
-    def psi_func(self, point, u):
-        x = point[0]
-        t = point[1]
-        return (self.two * x * tf.keras.backend.sin(self.pi * t)) + (tf.keras.backend.pow(t, 2) - t) * (tf.keras.backend.pow(x, 2) - x) * u
+    def psi_func(self, points, u, predict=False):
+
+        if predict:
+            x = points[0]
+            t = points[1]
+            points = tf.expand_dims(points, axis=0)
+        else:
+            x, t = tf.unstack(points, axis=1)
+ 
+        point_1t = tf.math.multiply(points, tf.constant(np.array([0, 1]), dtype=tf.double))
+        point_1t = tf.math.add(point_1t, tf.constant(np.array([1, 0]), dtype=tf.double))
+
+        with tf.GradientTape(persistent=True) as tape_ord_1:
+            tape_ord_1.watch(point_1t)
+            u_1t = tf.cast(self(point_1t, training=False), dtype=tf.double)
+            u1t = tape_ord_1.gradient(u_1t, point_1t)
+        
+        u1t_x, u1t_t = tf.unstack(u1t, axis=1)
+        psi = (self.two * x *
+               tf.keras.backend.sin(self.pi * t)) + (tf.keras.backend.pow(
+                   t, 2) - t) * (tf.keras.backend.pow(x, 2) - x) * (u - u_1t - u1t_x)
+        return psi
 
     @tf.function
     def loss_f(self, point, psi, dpsi_dxdt, d2psi_dx2dt2):
@@ -146,7 +163,7 @@ class ODENetwork(tf.keras.Model):
         d2psi_dx2 = d2psi_dx2dt2[0]
         d2psi_dt2 = d2psi_dx2dt2[1]
 
-        loss_f = tf.keras.backend.square(
+        loss_f = tf.keras.backend.abs(
             d2psi_dx2 + d2psi_dt2 + psi * dpsi_dx -
             tf.keras.backend.sin(self.pi * t) *
             (self.two - tf.keras.backend.pow(self.pi, 2) *
@@ -164,6 +181,7 @@ class ODENetwork(tf.keras.Model):
 
                 u_training = tf.cast(self(points, training=True), dtype=tf.double)
                 psi = self.psi_func(points, u_training)
+
                 dpsi_dxdt = tape_ord_1.gradient(psi, points)
                 d2psi_dx2dt2 = tape_ord_2.gradient(dpsi_dxdt, points)
 
@@ -189,7 +207,10 @@ class ODENetwork(tf.keras.Model):
 
     def psi_predict(self, points):
         u_pred = tf.cast(self.predict(points), dtype=tf.double)
-        return tf.keras.backend.map_fn(lambda x: self.psi_func(x[0], x[1]), (points, u_pred), dtype=tf.double)
+        predictions = tf.keras.backend.map_fn(lambda x: self.psi_func(x[0], x[1], True), (points, u_pred), dtype=tf.double)
+        return predictions
+
+
 
 
 def main():
@@ -202,13 +223,13 @@ def main():
     x, t, xx, tt, xt_train = ODENetwork.data(xmin, xmax, 100, tmin, tmax, 100)
     f_exact                = ODENetwork.exact(xt_train)
 
-    batch_size = 100 # len(xt_train)
+    batch_size = 25 # len(xt_train)
     epochs     = 1000 # 100000
 
     inputs = keras.Input(shape=(2, ))
-    l1 = layers.Dense(100, activation="sigmoid")(inputs)
-    l2 = layers.Dense(100, activation="sigmoid")(l1)
-    l3 = layers.Dense(100, activation="sigmoid")(l2)
+    l1 = layers.Dense(1024, activation="sigmoid")(inputs)
+    l2 = layers.Dense(1024, activation="sigmoid")(l1)
+    l3 = layers.Dense(1024, activation="sigmoid")(l2)
     outputs = layers.Dense(1, activation="linear")(l3)
     model = ODENetwork(inputs, outputs)
 
@@ -230,7 +251,6 @@ def main():
                   MonitorCallback()
               ])
 
-    print("\n b: {}, k: {}".format(model.b.numpy(), model.k.numpy()))
     # model.save('ode2ord_paramfit.h5')
 
 if __name__ == '__main__':
