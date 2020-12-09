@@ -1,4 +1,6 @@
 import os
+
+from tensorflow.python.keras.backend import l2_normalize
 os.environ["CUDA_VISIBLE_DEVICES"]=" "
 os.environ['TF_CPP_MIN_LOG_LEVEL']="3"
 import tensorflow as tf
@@ -84,6 +86,7 @@ class MonitorCallback(keras.callbacks.Callback):
 class ODENetwork(tf.keras.Model):
 
     optimizer = tf.keras.optimizers.Adam(learning_rate=0.05)
+    # optimizer = tf.keras.optimizers.SGD(learning_rate=0.05)
     initializer = tf.keras.initializers.GlorotUniform()
 
     zero = tf.constant(0.0, dtype=tf.double)
@@ -100,8 +103,6 @@ class ODENetwork(tf.keras.Model):
     ax0 = fig.add_subplot(121, projection='3d')
     ax1 = fig.add_subplot(122)
     plt.subplots_adjust(top=0.90, hspace = 0.35)
-    mng = plt.get_current_fig_manager()
-    mng.resize(*mng.window.maxsize())
     plt.show(block=False)
 
     xmin =  0.0
@@ -131,6 +132,10 @@ class ODENetwork(tf.keras.Model):
         return f_exact
 
     @tf.function
+    def gaussian(x, beta=2):
+        return tf.keras.backend.exp(-tf.keras.backend.pow(beta * x, 2))
+
+    @tf.function
     def psi_func(self, points, u, predict=False):
 
         if predict:
@@ -139,19 +144,26 @@ class ODENetwork(tf.keras.Model):
             points = tf.expand_dims(points, axis=0)
         else:
             x, t = tf.unstack(points, axis=1)
- 
+
         point_1t = tf.math.multiply(points, tf.constant(np.array([0, 1]), dtype=tf.double))
         point_1t = tf.math.add(point_1t, tf.constant(np.array([1, 0]), dtype=tf.double))
 
         with tf.GradientTape(persistent=True) as tape_ord_1:
             tape_ord_1.watch(point_1t)
             u_1t = tf.cast(self(point_1t, training=False), dtype=tf.double)
-            u1t = tape_ord_1.gradient(u_1t, point_1t)
-        
-        u1t_x, u1t_t = tf.unstack(u1t, axis=1)
+        #     u1t = tape_ord_1.gradient(u_1t, point_1t)
+
+        # u1t_x, u1t_t = tf.unstack(u1t, axis=1)
         psi = (self.two * x *
-               tf.keras.backend.sin(self.pi * t)) + (tf.keras.backend.pow(
-                   t, 2) - t) * (tf.keras.backend.pow(x, 2) - x) * (u - u_1t - u1t_x)
+               tf.keras.backend.sin(self.pi * t)) + (t - tf.keras.backend.pow(
+                   t, 2)) * x * u * (tf.keras.backend.sin(u - u_1t) - x)
+
+
+        # psi = (self.two * x * tf.keras.backend.sin(self.pi * t)
+        #        ) + (t - tf.keras.backend.pow(t, 2)) * x * (u - u1t_x)
+
+        # psi = (self.two * x * tf.keras.backend.sin(self.pi * t)
+        #        ) + (t - tf.keras.backend.pow(t, 2)) * x * (u - u_1t - u1t_x)
         return psi
 
     @tf.function
@@ -163,7 +175,7 @@ class ODENetwork(tf.keras.Model):
         d2psi_dx2 = d2psi_dx2dt2[0]
         d2psi_dt2 = d2psi_dx2dt2[1]
 
-        loss_f = tf.keras.backend.abs(
+        loss_f = tf.keras.backend.square(
             d2psi_dx2 + d2psi_dt2 + psi * dpsi_dx -
             tf.keras.backend.sin(self.pi * t) *
             (self.two - tf.keras.backend.pow(self.pi, 2) *
@@ -207,10 +219,10 @@ class ODENetwork(tf.keras.Model):
 
     def psi_predict(self, points):
         u_pred = tf.cast(self.predict(points), dtype=tf.double)
-        predictions = tf.keras.backend.map_fn(lambda x: self.psi_func(x[0], x[1], True), (points, u_pred), dtype=tf.double)
+        predictions = tf.keras.backend.map_fn(
+            lambda x: self.psi_func(x[0], x[1], True), (points, u_pred),
+            dtype=tf.double)
         return predictions
-
-
 
 
 def main():
@@ -227,10 +239,10 @@ def main():
     epochs     = 1000 # 100000
 
     inputs = keras.Input(shape=(2, ))
-    l1 = layers.Dense(1024, activation="sigmoid")(inputs)
-    l2 = layers.Dense(1024, activation="sigmoid")(l1)
-    l3 = layers.Dense(1024, activation="sigmoid")(l2)
-    outputs = layers.Dense(1, activation="linear")(l3)
+    x  = layers.Dense(2048, activation="sigmoid")(inputs)
+    x  = layers.Dense(2, activation="sigmoid")(x)
+    a1 = layers.Add()([inputs, x])
+    outputs = layers.Dense(1, activation="linear")(a1)
     model = ODENetwork(inputs, outputs)
 
     print(model.summary())
