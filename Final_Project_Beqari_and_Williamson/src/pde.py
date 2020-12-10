@@ -146,6 +146,10 @@ class ODENetwork(tf.keras.Model):
         return f_exact
 
     @tf.function
+    def gaussian(x, beta=2):
+        return tf.keras.backend.exp(-tf.keras.backend.pow(beta * x, 2))
+
+    @tf.function
     def loss_f(self, point, f, f_grad, f_double_grad):
         x = point[0]
         t = point[1]
@@ -196,7 +200,8 @@ class ODENetwork(tf.keras.Model):
             f0t = tf.cast(self(point_0t, training=False), dtype=tf.double)
             f1t = tf.cast(self(point_1t, training=False), dtype=tf.double)
 
-            f1t_x = tape_ord_1.gradient(f1t, point_1t)
+            grad_f1t = tape_ord_1.gradient(f1t, point_1t)
+            f1t_x, f1t_t = tf.unstack(grad_f1t, axis=1)
 
             loss_ic = (
                 tf.keras.backend.square(fx0)
@@ -204,7 +209,7 @@ class ODENetwork(tf.keras.Model):
                 + tf.keras.backend.square(f0t)
                 + tf.keras.backend.square(f1t_x - ic_x)
             )
-            loss_ic = tf.reshape(loss_ic, (2,))
+
         return loss_ic
 
     def train_step(self, points):
@@ -260,14 +265,14 @@ def main():
     x, t, xx, tt, xt_train = ODENetwork.data(xmin, xmax, 100, tmin, tmax, 100)
     # f_exact = ODENetwork.exact(xt_train)
 
-    batch_size = 25  # len(xt_train)
-    epochs = 1000  # 100000
+    batch_size = 5  # len(xt_train)
+    epochs = 5000  # 100000
 
     inputs = keras.Input(shape=(2, ))
-    l1 = layers.Dense(50, activation="sigmoid")(inputs)
-    l2 = layers.Dense(50, activation="sigmoid")(l1)
-    l3 = layers.Dense(50, activation="sigmoid")(l2)
-    outputs = layers.Dense(1, activation="linear")(l3)
+    x = layers.Dense(50, activation=ODENetwork.gaussian)(inputs)
+    x = layers.Dense(50, activation="sigmoid")(x)
+    # x = layers.Dense(1024, activation="sigmoid")(x)
+    outputs = layers.Dense(1, activation="linear")(x)
     model = ODENetwork(inputs, outputs)
 
     print(model.summary())

@@ -74,9 +74,12 @@ class MonitorCallback(keras.callbacks.Callback):
 
         loss_f  = self.model.hist['loss_f']
         loss_f.append(logs['loss_f'])
+        loss_d  = self.model.hist['loss_d']
+        loss_d.append(logs['loss_d'])
 
         self.model.ax1.clear()
         self.model.ax1.plot(loss_f)
+        self.model.ax1.plot(loss_d)
         self.model.ax1.set_xlabel('Epoch')
         self.model.ax1.set_ylabel('Error')
         # self.model.axs[1].set_ylim(0.0, 0.02)
@@ -95,8 +98,10 @@ class ODENetwork(tf.keras.Model):
     pi   = tf.constant(np.pi, dtype=tf.double)
 
     loss_f_trckr  = tf.keras.metrics.Mean(name="loss_f")
+    loss_d_trckr  = tf.keras.metrics.Mean(name="loss_d")
     hist = {
         "loss_f": [],
+        "loss_d": [],
     }
 
     fig = plt.figure()
@@ -136,8 +141,27 @@ class ODENetwork(tf.keras.Model):
         return tf.keras.backend.exp(-tf.keras.backend.pow(beta * x, 2))
 
     @tf.function
-    def psi_func(self, points, u, predict=False):
+    def loss_d(self, points):
+        point_1t = tf.math.multiply(points, tf.constant(np.array([0, 1]), dtype=tf.double))
+        point_1t = tf.math.add(point_1t, tf.constant(np.array([1, 0]), dtype=tf.double))
+        point_1t = tf.expand_dims(point_1t, axis=0)
 
+        with tf.GradientTape(persistent=True) as tape_ord_2:
+            tape_ord_2.watch(point_1t)
+
+            with tf.GradientTape(persistent=True) as tape_ord_1:
+                tape_ord_1.watch(point_1t)
+
+                u_1t = tf.cast(self(point_1t, training=False), dtype=tf.double)
+                du_d1t = tape_ord_1.gradient(u_1t, point_1t)
+                d2u_d1t2 = tape_ord_1.gradient(du_d1t, point_1t)
+
+        d2_du1t_x2, d2_du1t_t2 = tf.unstack(d2u_d1t2, axis=1)
+        loss_d =  tf.keras.backend.abs(u_1t - d2_du1t_x2)
+        return loss_d
+
+    @tf.function
+    def psi_func(self, points, u, predict=False):
         if predict:
             x = points[0]
             t = points[1]
@@ -145,25 +169,21 @@ class ODENetwork(tf.keras.Model):
         else:
             x, t = tf.unstack(points, axis=1)
 
-        point_1t = tf.math.multiply(points, tf.constant(np.array([0, 1]), dtype=tf.double))
-        point_1t = tf.math.add(point_1t, tf.constant(np.array([1, 0]), dtype=tf.double))
+        point_1t = tf.math.multiply(
+            points, tf.constant(np.array([0, 1]), dtype=tf.double))
+        point_1t = tf.math.add(point_1t,
+                               tf.constant(np.array([1, 0]), dtype=tf.double))
 
-        with tf.GradientTape(persistent=True) as tape_ord_1:
-            tape_ord_1.watch(point_1t)
+        with tf.GradientTape(persistent=True) as tape_ord_x1:
+            tape_ord_x1.watch(point_1t)
+
             u_1t = tf.cast(self(point_1t, training=False), dtype=tf.double)
-        #     u1t = tape_ord_1.gradient(u_1t, point_1t)
+            du_d1t = tape_ord_x1.gradient(u_1t, point_1t)
 
-        # u1t_x, u1t_t = tf.unstack(u1t, axis=1)
-        psi = (self.two * x *
-               tf.keras.backend.sin(self.pi * t)) + (t - tf.keras.backend.pow(
-                   t, 2)) * x * u * (tf.keras.backend.sin(u - u_1t) - x)
+        du_d1t_x, du_d1t_t = tf.unstack(du_d1t, axis=1)
+        psi = (self.two * x * tf.keras.backend.sin(self.pi * t)
+               ) + (t - tf.keras.backend.pow(t, 2)) * x * (u - u_1t - du_d1t_x)
 
-
-        # psi = (self.two * x * tf.keras.backend.sin(self.pi * t)
-        #        ) + (t - tf.keras.backend.pow(t, 2)) * x * (u - u1t_x)
-
-        # psi = (self.two * x * tf.keras.backend.sin(self.pi * t)
-        #        ) + (t - tf.keras.backend.pow(t, 2)) * x * (u - u_1t - u1t_x)
         return psi
 
     @tf.function
@@ -184,13 +204,14 @@ class ODENetwork(tf.keras.Model):
         return loss_f
 
     def train_step(self, points):
+        # x, t = tf.unstack(points, axis=1)
 
         with tf.GradientTape(persistent=True) as tape_ord_2:
             tape_ord_2.watch(points)
 
             with tf.GradientTape(persistent=True) as tape_ord_1:
                 tape_ord_1.watch(points)
-
+               
                 u_training = tf.cast(self(points, training=True), dtype=tf.double)
                 psi = self.psi_func(points, u_training)
 
@@ -203,13 +224,21 @@ class ODENetwork(tf.keras.Model):
                     dtype=tf.double)
                 loss_f = tf.reduce_mean(loss_f, axis=-1)
 
-        self.loss_f_trckr.update_state(loss_f)
+                loss_d = tf.keras.backend.map_fn(
+                    lambda x: self.loss_d(x), (points), dtype=tf.double)
+                loss_d = tf.reduce_mean(loss_d, axis=-1)
 
-        grads = tape_ord_1.gradient(loss_f, self.trainable_weights)
+                loss = 0.00001 * loss_f + 0.99999 * loss_d
+
+        self.loss_f_trckr.update_state(loss_f)
+        self.loss_d_trckr.update_state(loss_d)
+
+        grads = tape_ord_1.gradient(loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
 
         return {
             "loss_f": self.loss_f_trckr.result(),
+            "loss_d": self.loss_d_trckr.result(),
             "points": points
         }
 
@@ -235,14 +264,12 @@ def main():
     x, t, xx, tt, xt_train = ODENetwork.data(xmin, xmax, 100, tmin, tmax, 100)
     f_exact                = ODENetwork.exact(xt_train)
 
-    batch_size = 25 # len(xt_train)
+    batch_size = 5 # len(xt_train)
     epochs     = 1000 # 100000
 
     inputs = keras.Input(shape=(2, ))
-    x  = layers.Dense(2048, activation="sigmoid")(inputs)
-    x  = layers.Dense(2, activation="sigmoid")(x)
-    a1 = layers.Add()([inputs, x])
-    outputs = layers.Dense(1, activation="linear")(a1)
+    x  = layers.Dense(10, activation="tanh")(inputs)
+    outputs = layers.Dense(1, activation="linear")(x)
     model = ODENetwork(inputs, outputs)
 
     print(model.summary())
