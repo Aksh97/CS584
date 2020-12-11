@@ -1,7 +1,5 @@
 import os
 
-from tensorflow.python.keras.backend import l2_normalize
-
 os.environ["CUDA_VISIBLE_DEVICES"] = " "
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import tensorflow as tf
