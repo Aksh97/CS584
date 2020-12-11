@@ -23,6 +23,7 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 
 class MonitorCallback(keras.callbacks.Callback):
+
     def on_epoch_end(self, epoch, logs=None):
 
         points = logs["points"]
@@ -45,7 +46,9 @@ class MonitorCallback(keras.callbacks.Callback):
 
         u_pred = self.model.psi_predict(self.model.xt_train)
         u_pred = np.squeeze(u_pred.numpy())
-        abs_error = np.abs(np.sum(self.model.z - u_pred))
+        abs_error = np.sum(np.abs(self.model.z - u_pred))
+
+        print("epoch: {}, loss_f: {0:.3f}, abs. error {0:.3f}, loss_d: {0:.8f} ".format(epoch, logs["loss_f"], abs_error, logs["loss_d"]))
 
         surf1 = self.model.ax0.plot_surface(
             self.model.tt,
@@ -87,14 +90,14 @@ class MonitorCallback(keras.callbacks.Callback):
         self.model.ax1.plot(loss_f, c="orange")
         self.model.ax1.set_xlabel("Epoch")
         self.model.ax1.set_ylabel("Error")
-        self.model.ax1.set_ylim(-1.0, max(loss_f[:100]) + 10)
+        self.model.ax1.set_ylim(-1.0, max(loss_f[:100]) + 100)
         self.model.ax1.legend(["loss_f"], loc="upper right")
 
         self.model.ax2.clear()
         self.model.ax2.plot(error, c="red")
         self.model.ax2.set_xlabel("Epoch")
         self.model.ax2.set_ylabel("Error")
-        self.model.ax2.set_ylim(-1.0, max(error[:100]) + 10)
+        self.model.ax2.set_ylim(-1.0, max(error[:100]) + 100)
         self.model.ax2.legend(["abs. error"], loc="upper right")
 
         self.model.ax3.clear()
@@ -109,8 +112,8 @@ class MonitorCallback(keras.callbacks.Callback):
 
 class ODENetwork(tf.keras.Model):
 
-    # optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-    optimizer = tf.keras.optimizers.SGD(learning_rate=0.05)
+    # optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
+    optimizer = tf.keras.optimizers.SGD(learning_rate=0.005)
     initializer = tf.keras.initializers.GlorotUniform()
 
     zero = tf.constant(0.0, dtype=tf.double)
@@ -180,10 +183,11 @@ class ODENetwork(tf.keras.Model):
 
                 u_1t = tf.cast(self(point_1t, training=False), dtype=tf.double)
                 du_d1t = tape_ord_1.gradient(u_1t, point_1t)
-                d2u_d1t2 = tape_ord_1.gradient(du_d1t, point_1t)
+                d2u_d1t2 = tape_ord_2.gradient(du_d1t, point_1t)
 
-        d2_du1t_x2, d2_du1t_t2 = tf.unstack(d2u_d1t2, axis=1)
-        loss_d = tf.keras.backend.abs(u_1t - d2_du1t_x2)
+        du_d1t_x, du_d1t_t = tf.unstack(du_d1t, axis=1)
+        d2u_d1t_x2, d2u_d1t_t2 = tf.unstack(d2u_d1t2, axis=1)
+        loss_d = tf.keras.backend.abs(du_d1t_x + d2u_d1t_x2)
         return loss_d
 
     @tf.function
@@ -221,7 +225,7 @@ class ODENetwork(tf.keras.Model):
         d2psi_dx2 = d2psi_dx2dt2[0]
         d2psi_dt2 = d2psi_dx2dt2[1]
 
-        loss_f = tf.keras.backend.square(
+        loss_f = tf.keras.backend.abs(
             d2psi_dx2
             + d2psi_dt2
             + psi * dpsi_dx
@@ -298,9 +302,9 @@ def main():
     tmax = 1.0
 
     x, t, xx, tt, xt_train = ODENetwork.data(xmin, xmax, 100, tmin, tmax, 100)
-    f_exact = ODENetwork.exact(xt_train)
+    # f_exact = ODENetwork.exact(xt_train)
 
-    batch_size = 5  # len(xt_train)
+    batch_size = 100  # len(xt_train)
     epochs = 10000  # 100000
 
     inputs = keras.Input(shape=(2,))
@@ -321,7 +325,7 @@ def main():
         xt_ds,
         epochs=epochs,
         workers=-1,
-        verbose=1,
+        verbose=0,
         callbacks=[tf.keras.callbacks.TerminateOnNaN(), MonitorCallback()],
     )
 
