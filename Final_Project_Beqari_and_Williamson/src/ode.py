@@ -65,7 +65,7 @@ class MonitorCallback(keras.callbacks.Callback):
 
 class ODENetwork(tf.keras.Model):
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.0005)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.005)
     initializer = tf.keras.initializers.GlorotUniform()
 
     t_0  = tf.constant(np.array([[0.0]]), dtype=tf.double)

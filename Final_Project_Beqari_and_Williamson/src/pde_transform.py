@@ -48,7 +48,7 @@ class MonitorCallback(keras.callbacks.Callback):
         u_pred = np.squeeze(u_pred.numpy())
         abs_error = np.sum(np.abs(self.model.z - u_pred))
 
-        print("epoch: {}, loss_f: {0:.3f}, abs. error {0:.3f}, loss_d: {0:.8f} ".format(epoch, logs["loss_f"], abs_error, logs["loss_d"]))
+        print("epoch: {}, loss_f: {:.3f}, abs. error {:.3f}, loss_d: {:.8f} ".format(epoch, logs["loss_f"], abs_error, logs["loss_d"]))
 
         surf1 = self.model.ax0.plot_surface(
             self.model.tt,
@@ -267,7 +267,7 @@ class ODENetwork(tf.keras.Model):
                 )
                 loss_d = tf.reduce_mean(loss_d, axis=-1)
 
-                loss = 0.00001 * loss_f + 0.99999 * loss_d
+                loss = loss_f + loss_d
                 # loss = loss_f
 
         self.loss_f_trckr.update_state(loss_f)
@@ -304,11 +304,11 @@ def main():
     x, t, xx, tt, xt_train = ODENetwork.data(xmin, xmax, 100, tmin, tmax, 100)
     # f_exact = ODENetwork.exact(xt_train)
 
-    batch_size = 100  # len(xt_train)
+    batch_size = 128 #len(xt_train)
     epochs = 10000  # 100000
 
     inputs = keras.Input(shape=(2,))
-    x = layers.Dense(10, activation="tanh")(inputs)
+    x = layers.Dense(128, activation="tanh")(inputs)
     outputs = layers.Dense(1, activation="linear")(x)
     model = ODENetwork(inputs, outputs)
 

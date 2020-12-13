@@ -203,8 +203,8 @@ def main():
     x_exact                = ODENetwork.exact(t_train)
     t_observed, x_observed = ODENetwork.observed(t_index, t_train, x_exact, mu=0, sigma=0.05, points=2000)
 
-    batch_size = 25 # len(t_train)
-    epochs     = 5000 # 100000
+    batch_size = 5 # len(t_train)
+    epochs     = 10000
 
     inputs = keras.Input(shape=(1, ))
     l1 = layers.Dense(50,
@@ -213,19 +213,19 @@ def main():
                       kernel_regularizer=ODENetwork.kernel_regularizer,
                       bias_regularizer=ODENetwork.bias_regularizer,
                       activity_regularizer=ODENetwork.activity_regularizer)(inputs)
-    l2 = layers.Dense(50,
-                      activation="sigmoid",
-                      kernel_initializer=ODENetwork.initializer,
-                      kernel_regularizer=ODENetwork.kernel_regularizer,
-                      bias_regularizer=ODENetwork.bias_regularizer,
-                      activity_regularizer=ODENetwork.activity_regularizer)(l1)
-    l3 = layers.Dense(50,
-                      activation="sigmoid",
-                      kernel_initializer=ODENetwork.initializer,
-                      kernel_regularizer=ODENetwork.kernel_regularizer,
-                      bias_regularizer=ODENetwork.bias_regularizer,
-                      activity_regularizer=ODENetwork.activity_regularizer)(l2)
-    outputs = layers.Dense(1, activation="linear")(l3)
+    # l2 = layers.Dense(50,
+    #                   activation="sigmoid",
+    #                   kernel_initializer=ODENetwork.initializer,
+    #                   kernel_regularizer=ODENetwork.kernel_regularizer,
+    #                   bias_regularizer=ODENetwork.bias_regularizer,
+    #                   activity_regularizer=ODENetwork.activity_regularizer)(l1)
+    # l3 = layers.Dense(50,
+    #                   activation="sigmoid",
+    #                   kernel_initializer=ODENetwork.initializer,
+    #                   kernel_regularizer=ODENetwork.kernel_regularizer,
+    #                   bias_regularizer=ODENetwork.bias_regularizer,
+    #                   activity_regularizer=ODENetwork.activity_regularizer)(l2)
+    outputs = layers.Dense(1, activation="linear")(l1)
     model = ODENetwork(inputs, outputs)
 
     print(model.summary())
