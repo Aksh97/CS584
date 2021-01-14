@@ -153,7 +153,7 @@ class ODENetwork(tf.keras.Model):
                 u_training = tf.cast(self(t_observed, training=True), dtype=tf.double)
                 psi = self.psi_func(t_observed, u_training)
                 dpsi_dt = tape_ord_1.gradient(psi, t_observed)
-                d2psi_dt2 = tape_ord_1.gradient(dpsi_dt, t_observed)
+                d2psi_dt2 = tape_ord_2.gradient(dpsi_dt, t_observed)
 
                 loss_f = tf.keras.backend.map_fn(
                     lambda x: self.loss_f(x[0], x[1], x[2]),
